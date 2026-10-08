@@ -61,6 +61,12 @@ class FaceTracker:
         self.recheck_interval = recheck_interval
         self.next_track_id = 1
         self.tracks = {}  # {track_id: TrackedFace}
+        self.last_recognition_ms = 0.0
+        self.last_recognition_count = 0
+
+    def get_active_tracks(self):
+        """Return cached tracks on frames where face detection is skipped."""
+        return list(self.tracks.values())
 
     def update(self, detections, frame, face_engine):
         """
@@ -68,6 +74,8 @@ class FaceTracker:
         detections: danh sách từ face_engine.detect()
         Trả về danh sách các track hiện tại để vẽ lên màn hình.
         """
+        recognition_started = None
+        self.last_recognition_count = 0
         matched_track_ids = set()
         unmatched_detections = []
 
@@ -126,8 +134,11 @@ class FaceTracker:
 
             if need_recognition:
                 try:
+                    if recognition_started is None:
+                        recognition_started = time.perf_counter()
                     feat = face_engine.extract_feature(frame, track.raw_face)
                     name, conf = face_engine.match(feat)
+                    self.last_recognition_count += 1
                     
                     track.recognition_count += 1
                     if conf > track.confidence or track.recognition_count == 1:
@@ -140,5 +151,10 @@ class FaceTracker:
                         track.recheck_counter = 0
                 except Exception as e:
                     pass
+
+        if recognition_started is None:
+            self.last_recognition_ms = 0.0
+        else:
+            self.last_recognition_ms = (time.perf_counter() - recognition_started) * 1000.0
 
         return list(self.tracks.values())

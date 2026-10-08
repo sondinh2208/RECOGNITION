@@ -28,8 +28,11 @@ class ThreadedCamera:
 
         self.grabbed = False
         self.frame = None
+        self.frame_sequence = 0
+        self.frame_captured_at = 0.0
         self.running = False
         self.lock = threading.Lock()
+        self.frame_ready = threading.Condition(self.lock)
         self.thread = None
 
     def _init_camera(self):
@@ -66,18 +69,31 @@ class ThreadedCamera:
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
         self.cap.set(cv2.CAP_PROP_FPS, self.target_fps)
+        self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 
         # Lấy kích thước thực tế
         actual_w = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         actual_h = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        print(f"[Camera] Camera sẵn sàng: cổng {self.src}, độ phân giải {actual_w}x{actual_h}")
+        actual_fps = self.cap.get(cv2.CAP_PROP_FPS)
+        fourcc_value = int(self.cap.get(cv2.CAP_PROP_FOURCC))
+        actual_fourcc = "".join(chr((fourcc_value >> (8 * i)) & 0xFF) for i in range(4))
+        print(
+            f"[Camera] Camera san sang: cong {self.src}, {actual_w}x{actual_h}, "
+            f"FPS bao cao={actual_fps:.1f}, FOURCC={actual_fourcc!r}"
+        )
 
     def start(self):
         if self.cap is None or not self.cap.isOpened():
             return False
 
         self.running = True
-        self.grabbed, self.frame = self.cap.read()
+        grabbed, frame = self.cap.read()
+        with self.frame_ready:
+            self.grabbed = grabbed
+            self.frame = frame
+            if grabbed and frame is not None:
+                self.frame_sequence = 1
+                self.frame_captured_at = time.perf_counter()
         self.thread = threading.Thread(target=self._capture_loop, daemon=True)
         self.thread.start()
         return True
@@ -88,13 +104,14 @@ class ThreadedCamera:
                 break
             ret, frame = self.cap.read()
             if ret:
-                with self.lock:
+                with self.frame_ready:
                     self.frame = frame
                     self.grabbed = True
+                    self.frame_sequence += 1
+                    self.frame_captured_at = time.perf_counter()
+                    self.frame_ready.notify_all()
             else:
                 time.sleep(0.01)
-            # Nghỉ rất nhỏ để tránh chiếm 100% nhân CPU của thread capture
-            time.sleep(0.002)
 
     def read(self):
         with self.lock:
@@ -102,8 +119,26 @@ class ThreadedCamera:
                 return self.grabbed, self.frame.copy()
             return False, None
 
+    def read_new(self, last_sequence=-1, timeout=0.1):
+        """Return only a newly captured frame and its monotonic timestamp."""
+        with self.frame_ready:
+            if self.running and self.frame_sequence == last_sequence:
+                self.frame_ready.wait(timeout=timeout)
+
+            if self.frame is None or self.frame_sequence == last_sequence:
+                return False, None, self.frame_sequence, self.frame_captured_at
+
+            return (
+                self.grabbed,
+                self.frame.copy(),
+                self.frame_sequence,
+                self.frame_captured_at,
+            )
+
     def release(self):
         self.running = False
+        with self.frame_ready:
+            self.frame_ready.notify_all()
         if self.thread is not None and self.thread.is_alive():
             self.thread.join(timeout=1.0)
         if self.cap is not None:

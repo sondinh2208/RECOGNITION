@@ -17,7 +17,6 @@ os.environ.setdefault("OMP_NUM_THREADS", "2")
 os.environ.setdefault("OPENBLAS_NUM_THREADS", "2")
 
 import cv2
-import numpy as np
 
 cv2.setUseOptimized(True)
 cv2.setNumThreads(2)
@@ -31,6 +30,7 @@ if hasattr(sys.stdout, 'reconfigure'):
 from face_engine import FaceEngine
 from face_tracker import FaceTracker
 from camera_stream import ThreadedCamera
+from latest_frame_worker import LatestFrameWorker
 from serial_manager import SerialManager
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -67,19 +67,41 @@ def run_recognition():
     stats_started = None
     stats_start_sequence = None
     processed_in_window = 0
-    processed_total = 0
     camera_fps = 0.0
     processing_fps = 0.0
+    ai_fps = 0.0
+    ai_completed_in_window = 0
+    last_ai_sequence = -1
     detect_ms_smooth = 0.0
     process_ms_smooth = 0.0
     recognition_ms_smooth = 0.0
     last_status_print = time.monotonic()
     headless = False
 
-    # Kích thước ảnh dùng để detect (320x240 để đạt tốc độ cực đại trên Pi 4)
-    DET_WIDTH = 320
-    DET_HEIGHT = 240
-    DETECT_EVERY = 2
+    active_tracks = []
+    ai_frame_age_ms = 0.0
+
+    def process_inference(inference_frame):
+        detect_started = time.perf_counter()
+        detections = engine.detect_scaled(inference_frame, input_size=(320, 240))
+        detect_ms = (time.perf_counter() - detect_started) * 1000.0
+        tracks = tracker.update(detections, inference_frame, engine)
+        snapshots = [
+            {
+                "bbox": tuple(track.bbox),
+                "name": track.name,
+                "confidence": track.confidence,
+                "recognized": track.recognized,
+            }
+            for track in tracks
+        ]
+        return {
+            "tracks": snapshots,
+            "detect_ms": detect_ms,
+            "recognition_ms": tracker.last_recognition_ms,
+        }
+
+    inference_worker = LatestFrameWorker(process_inference, name="face-inference")
 
     try:
         while True:
@@ -89,101 +111,67 @@ def run_recognition():
 
             last_sequence = sequence
             frame_start = time.perf_counter()
-            processed_total += 1
             processed_in_window += 1
             if stats_started is None:
                 stats_started = frame_start
                 stats_start_sequence = sequence
 
-            h, w = frame.shape[:2]
-
-            run_detection = (processed_total - 1) % DETECT_EVERY == 0
-            if run_detection:
-                detect_started = time.perf_counter()
-                small_frame = cv2.resize(
-                    frame, (DET_WIDTH, DET_HEIGHT), interpolation=cv2.INTER_LINEAR
-                )
-                scale_x = w / float(DET_WIDTH)
-                scale_y = h / float(DET_HEIGHT)
-                small_faces = engine.detect(
-                    small_frame, input_size=(DET_WIDTH, DET_HEIGHT)
-                )
-                detect_ms = (time.perf_counter() - detect_started) * 1000.0
-
-                scaled_detections = []
-                for sf in small_faces:
-                    bx, by, bw, bh = sf['bbox']
-                    orig_bbox = [
-                        int(bx * scale_x),
-                        int(by * scale_y),
-                        int(bw * scale_x),
-                        int(bh * scale_y)
-                    ]
-
-                    raw = sf['raw'].copy()
-                    raw[0] *= scale_x
-                    raw[1] *= scale_y
-                    raw[2] *= scale_x
-                    raw[3] *= scale_y
-                    for p_idx in range(5):
-                        raw[4 + p_idx * 2] *= scale_x
-                        raw[5 + p_idx * 2] *= scale_y
-
-                    landmarks = [
-                        (pt[0] * scale_x, pt[1] * scale_y)
-                        for pt in sf['landmarks']
-                    ]
-                    scaled_detections.append({
-                        'bbox': orig_bbox,
-                        'landmarks': landmarks,
-                        'score': sf['score'],
-                        'raw': raw
-                    })
-
-                active_tracks = tracker.update(scaled_detections, frame, engine)
+            # The worker owns this unmodified frame. Drawing happens on a copy below.
+            inference_worker.submit(frame, sequence, captured_at)
+            ai_result = inference_worker.get_latest()
+            if (
+                ai_result is not None
+                and ai_result["sequence"] != last_ai_sequence
+                and ai_result["error"] is None
+            ):
+                last_ai_sequence = ai_result["sequence"]
+                ai_completed_in_window += 1
+                result_value = ai_result["value"]
+                active_tracks = result_value["tracks"]
+                detect_ms = result_value["detect_ms"]
                 detect_ms_smooth = (
                     detect_ms if detect_ms_smooth == 0.0
                     else detect_ms_smooth * 0.8 + detect_ms * 0.2
                 )
-                if tracker.last_recognition_ms > 0.0:
+                recognition_ms = result_value["recognition_ms"]
+                if recognition_ms > 0.0:
                     recognition_ms_smooth = (
-                        tracker.last_recognition_ms if recognition_ms_smooth == 0.0
-                        else recognition_ms_smooth * 0.8
-                        + tracker.last_recognition_ms * 0.2
+                        recognition_ms if recognition_ms_smooth == 0.0
+                        else recognition_ms_smooth * 0.8 + recognition_ms * 0.2
                     )
-            else:
-                active_tracks = tracker.get_active_tracks()
+                process_ms = ai_result["process_ms"]
+                process_ms_smooth = (
+                    process_ms if process_ms_smooth == 0.0
+                    else process_ms_smooth * 0.85 + process_ms * 0.15
+                )
+                ai_frame_age_ms = max(
+                    0.0, (time.perf_counter() - ai_result["captured_at"]) * 1000.0
+                )
 
             # 5. Xử lý mở cửa khi nhận diện đúng người
             for track in active_tracks:
-                if track.recognized and track.name != "unknown" and track.name != "Đang nhận diện...":
+                if track["recognized"] and track["name"] not in ("unknown", "Đang nhận diện..."):
                     # Gửi lệnh mở cửa ESP32
-                    serial_mgr.send_open(trigger_name=track.name)
-
-            process_ms = (time.perf_counter() - frame_start) * 1000.0
-            process_ms_smooth = (
-                process_ms if process_ms_smooth == 0.0
-                else process_ms_smooth * 0.85 + process_ms * 0.15
-            )
+                    serial_mgr.send_open(trigger_name=track["name"])
             current_time = time.perf_counter()
             stats_elapsed = current_time - stats_started
             if stats_elapsed >= 1.0:
                 camera_fps = (sequence - stats_start_sequence) / stats_elapsed
                 processing_fps = processed_in_window / stats_elapsed
+                ai_fps = ai_completed_in_window / stats_elapsed
                 stats_started = current_time
                 stats_start_sequence = sequence
                 processed_in_window = 0
-            frame_age_ms = max(0.0, (current_time - captured_at) * 1000.0)
-
+                ai_completed_in_window = 0
             # 7. Vẽ giao diện và Bounding Box
             if not headless:
-                display_frame = frame
+                display_frame = frame.copy()
 
                 # Vẽ thông tin từng khuôn mặt
                 for track in active_tracks:
-                    x, y, bw, bh = track.bbox
-                    name = track.name
-                    conf = track.confidence
+                    x, y, bw, bh = track["bbox"]
+                    name = track["name"]
+                    conf = track["confidence"]
 
                     if name == "unknown":
                         color = (0, 0, 255)       # Đỏ: Người lạ
@@ -221,7 +209,8 @@ def run_recognition():
                 # Vẽ thanh thông tin trạng thái trên cùng
                 info_text = (
                     f"FPS: {processing_fps:.1f} CAM:{camera_fps:.1f} | "
-                    f"Mat:{len(active_tracks)} ESP32:{'OK' if serial_mgr.ser else 'OFF'}"
+                    f"AI:{ai_fps:.1f} Mat:{len(active_tracks)} "
+                    f"ESP32:{'OK' if serial_mgr.ser else 'OFF'}"
                 )
                 cv2.putText(
                     display_frame,
@@ -235,7 +224,7 @@ def run_recognition():
                 timing_text = (
                     f"DET:{detect_ms_smooth:.0f}ms "
                     f"REC:{recognition_ms_smooth:.0f}ms "
-                    f"PROC:{process_ms_smooth:.0f}ms AGE:{frame_age_ms:.0f}ms"
+                    f"PROC:{process_ms_smooth:.0f}ms AIAGE:{ai_frame_age_ms:.0f}ms"
                 )
                 cv2.putText(
                     display_frame,
@@ -263,8 +252,9 @@ def run_recognition():
                 if time.monotonic() - last_status_print >= 3.0:
                     print(
                         f"[Headless] FPS={processing_fps:.1f}, CAM={camera_fps:.1f}, "
-                        f"DET={detect_ms_smooth:.1f}ms, REC={recognition_ms_smooth:.1f}ms, "
-                        f"AGE={frame_age_ms:.1f}ms, faces={len(active_tracks)}"
+                        f"AI={ai_fps:.1f}, DET={detect_ms_smooth:.1f}ms, "
+                        f"REC={recognition_ms_smooth:.1f}ms, "
+                        f"AIAGE={ai_frame_age_ms:.1f}ms, faces={len(active_tracks)}"
                     )
                     last_status_print = time.monotonic()
 
@@ -272,6 +262,7 @@ def run_recognition():
         print("\n[Main] Đã nhận tín hiệu dừng từ bàn phím (Ctrl+C).")
 
     finally:
+        inference_worker.stop()
         cam.release()
         serial_mgr.close()
         cv2.destroyAllWindows()

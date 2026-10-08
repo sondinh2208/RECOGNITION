@@ -190,6 +190,48 @@ class FaceEngine:
 
         return results
 
+    def detect_scaled(self, frame, input_size=(320, 240)):
+        """Detect on a smaller image and map boxes/landmarks to the source."""
+        source_h, source_w = frame.shape[:2]
+        detect_w, detect_h = input_size
+        if (source_w, source_h) == input_size:
+            small_frame = frame
+        else:
+            small_frame = cv2.resize(
+                frame, input_size, interpolation=cv2.INTER_LINEAR
+            )
+
+        scale_x = source_w / float(detect_w)
+        scale_y = source_h / float(detect_h)
+        small_faces = self.detect(small_frame, input_size=input_size)
+        results = []
+        for face in small_faces:
+            bx, by, bw, bh = face["bbox"]
+            raw = face["raw"].copy()
+            raw[0] *= scale_x
+            raw[1] *= scale_y
+            raw[2] *= scale_x
+            raw[3] *= scale_y
+            for point_index in range(5):
+                raw[4 + point_index * 2] *= scale_x
+                raw[5 + point_index * 2] *= scale_y
+
+            results.append({
+                "bbox": [
+                    int(bx * scale_x),
+                    int(by * scale_y),
+                    int(bw * scale_x),
+                    int(bh * scale_y),
+                ],
+                "landmarks": [
+                    (point[0] * scale_x, point[1] * scale_y)
+                    for point in face["landmarks"]
+                ],
+                "score": face["score"],
+                "raw": raw,
+            })
+        return results
+
     def extract_feature(self, frame, raw_face):
         """
         Căn chỉnh khuôn mặt (alignCrop) và trích xuất vector đặc trưng 128 chiều.

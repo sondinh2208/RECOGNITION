@@ -28,7 +28,7 @@ def compute_iou(boxA, boxB):
 
 
 class TrackedFace:
-    def __init__(self, track_id, bbox, landmarks, raw_face):
+    def __init__(self, track_id, bbox, landmarks, raw_face, recognition_attempts=2):
         self.track_id = track_id
         self.bbox = bbox  # [x, y, w, h]
         self.landmarks = landmarks
@@ -38,7 +38,7 @@ class TrackedFace:
         self.confidence = 0.0
         self.recognized = False
         self.recognition_count = 0
-        self.max_recognition_attempts = 3  # Thử nhận diện tối đa 3 frame đầu để lấy độ tin cậy cao nhất
+        self.max_recognition_attempts = recognition_attempts
         
         self.missed_frames = 0
         self.created_time = time.time()
@@ -55,10 +55,19 @@ class TrackedFace:
 
 
 class FaceTracker:
-    def __init__(self, iou_threshold=0.3, max_missed=8, recheck_interval=60):
+    def __init__(
+        self,
+        iou_threshold=0.3,
+        max_missed=8,
+        recheck_interval=60,
+        recognition_attempts=2,
+        max_recognitions_per_update=1,
+    ):
         self.iou_threshold = iou_threshold
         self.max_missed = max_missed
         self.recheck_interval = recheck_interval
+        self.recognition_attempts = recognition_attempts
+        self.max_recognitions_per_update = max_recognitions_per_update
         self.next_track_id = 1
         self.tracks = {}  # {track_id: TrackedFace}
         self.last_recognition_ms = 0.0
@@ -121,7 +130,13 @@ class FaceTracker:
         for det in unmatched_detections:
             t_id = self.next_track_id
             self.next_track_id += 1
-            new_track = TrackedFace(t_id, det['bbox'], det['landmarks'], det['raw'])
+            new_track = TrackedFace(
+                t_id,
+                det['bbox'],
+                det['landmarks'],
+                det['raw'],
+                recognition_attempts=self.recognition_attempts,
+            )
             self.tracks[t_id] = new_track
 
         # Tiến hành Nhận diện danh tính (Chỉ chạy khi cần thiết)
@@ -132,7 +147,10 @@ class FaceTracker:
             need_recognition = (not track.recognized and track.recognition_count < track.max_recognition_attempts) or \
                                (track.recheck_counter >= self.recheck_interval)
 
-            if need_recognition:
+            if (
+                need_recognition
+                and self.last_recognition_count < self.max_recognitions_per_update
+            ):
                 try:
                     if recognition_started is None:
                         recognition_started = time.perf_counter()

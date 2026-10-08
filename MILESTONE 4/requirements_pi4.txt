@@ -15,3 +15,6 @@ fastapi>=0.95.0
 uvicorn>=0.21.0
 python-multipart>=0.0.6
 requests>=2.28.0
+
+# Camera CSI tren Raspberry Pi: cai bang apt, khong cai bang pip:
+# sudo apt install -y python3-picamera2 --no-install-recommends

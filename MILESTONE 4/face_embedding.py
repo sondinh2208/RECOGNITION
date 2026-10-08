@@ -64,10 +64,19 @@ def register_face():
     stats_start_sequence = None
     displayed_in_window = 0
     ai_completed_in_window = 0
+    register_detect_width = max(
+        128, min(320, int(os.environ.get("PI_REGISTER_DETECT_WIDTH", "192")))
+    )
+    register_detect_size = (
+        register_detect_width,
+        register_detect_width * 3 // 4,
+    )
 
     def process_registration_frame(inference_frame):
         return {
-            "faces": engine.detect_scaled(inference_frame, input_size=(320, 240)),
+            "faces": engine.detect_scaled(
+                inference_frame, input_size=register_detect_size
+            ),
             "frame": inference_frame,
         }
 
@@ -141,7 +150,9 @@ def register_face():
             # Hướng dẫn trên khung hình
             cv2.putText(
                 display_frame,
-                f"FPS:{display_fps:.1f} CAM:{camera_fps:.1f} AI:{ai_fps:.1f} ({ai_ms:.0f}ms)",
+                f"FPS:{display_fps:.1f} CAM:{camera_fps:.1f} "
+                f"AI:{ai_fps:.1f} {register_detect_size[0]}x{register_detect_size[1]} "
+                f"({ai_ms:.0f}ms)",
                 (10, 24),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 0.58,

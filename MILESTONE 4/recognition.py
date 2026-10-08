@@ -31,6 +31,7 @@ from face_engine import FaceEngine
 from face_tracker import FaceTracker
 from camera_stream import ThreadedCamera
 from latest_frame_worker import LatestFrameWorker
+from motion_tracker import OpticalFlowProjector
 from serial_manager import SerialManager
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -80,10 +81,13 @@ def run_recognition():
 
     active_tracks = []
     ai_frame_age_ms = 0.0
+    detect_width = max(128, min(320, int(os.environ.get("PI_DETECT_WIDTH", "160"))))
+    detect_size = (detect_width, detect_width * 3 // 4)
+    motion_projector = OpticalFlowProjector(width=320, height=240)
 
     def process_inference(inference_frame):
         detect_started = time.perf_counter()
-        detections = engine.detect_scaled(inference_frame, input_size=(320, 240))
+        detections = engine.detect_scaled(inference_frame, input_size=detect_size)
         detect_ms = (time.perf_counter() - detect_started) * 1000.0
         tracks = tracker.update(detections, inference_frame, engine)
         snapshots = [
@@ -92,6 +96,7 @@ def run_recognition():
                 "name": track.name,
                 "confidence": track.confidence,
                 "recognized": track.recognized,
+                "landmarks": list(track.landmarks),
             }
             for track in tracks
         ]
@@ -99,6 +104,7 @@ def run_recognition():
             "tracks": snapshots,
             "detect_ms": detect_ms,
             "recognition_ms": tracker.last_recognition_ms,
+            "reference_frame": inference_frame,
         }
 
     inference_worker = LatestFrameWorker(process_inference, name="face-inference")
@@ -127,7 +133,9 @@ def run_recognition():
                 last_ai_sequence = ai_result["sequence"]
                 ai_completed_in_window += 1
                 result_value = ai_result["value"]
-                active_tracks = result_value["tracks"]
+                motion_projector.reset(
+                    result_value["tracks"], result_value["reference_frame"]
+                )
                 detect_ms = result_value["detect_ms"]
                 detect_ms_smooth = (
                     detect_ms if detect_ms_smooth == 0.0
@@ -147,6 +155,8 @@ def run_recognition():
                 ai_frame_age_ms = max(
                     0.0, (time.perf_counter() - ai_result["captured_at"]) * 1000.0
                 )
+
+            active_tracks = motion_projector.update(frame)
 
             # 5. Xử lý mở cửa khi nhận diện đúng người
             for track in active_tracks:
@@ -222,7 +232,7 @@ def run_recognition():
                     2
                 )
                 timing_text = (
-                    f"DET:{detect_ms_smooth:.0f}ms "
+                    f"DET:{detect_size[0]}x{detect_size[1]} {detect_ms_smooth:.0f}ms "
                     f"REC:{recognition_ms_smooth:.0f}ms "
                     f"PROC:{process_ms_smooth:.0f}ms AIAGE:{ai_frame_age_ms:.0f}ms"
                 )

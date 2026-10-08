@@ -91,6 +91,21 @@ Menu sẽ hiển thị:
 python3 recognition.py
 ```
 - Trên màn hình sẽ hiển thị FPS thực tế, số lượng khuôn mặt và trạng thái ESP32.
+
+### Cau hinh hieu nang moi
+
+- Camera CSI tu dong dung Picamera2. Cai dat bang:
+  `sudo apt install -y python3-picamera2 --no-install-recommends`
+- USB webcam tu dong fallback sang V4L2/MJPEG.
+- `PI_CAMERA_BACKEND=v4l2` de buoc dung USB/V4L2.
+- `PI_CAMERA_BACKEND=picamera2` de uu tien camera CSI.
+- Nhan dien mac dinh dung YuNet 160x120. Neu mat o qua xa, thu
+  `PI_DETECT_WIDTH=192 python3 recognition.py`.
+- Dang ky mac dinh dung YuNet 192x144. Co the tang chat luong landmarks bang
+  `PI_REGISTER_DETECT_WIDTH=256 python3 face_embedding.py`.
+- Dong `FPS` la toc do giao dien, `CAM` la camera, `AI` la toc do model.
+- Do camera va YuNet truc tiep tren Pi bang:
+  `python3 benchmark_pi_performance.py`
 - Khi người đã đăng ký xuất hiện, hệ thống nhận diện ngay lập tức và gửi lệnh `OPEN\n` tới ESP32 để kích hoạt servo mở cửa.
 - Nhấn phím `Q` để dừng chương trình.
 

@@ -99,11 +99,18 @@ def ensure_models():
 
 
 class FaceEngine:
-    def __init__(self, score_threshold=0.6, nms_threshold=0.3, cosine_threshold=DEFAULT_COSINE_THRESHOLD):
+    def __init__(
+        self,
+        score_threshold=0.6,
+        nms_threshold=0.3,
+        cosine_threshold=DEFAULT_COSINE_THRESHOLD,
+        top_k=100,
+    ):
         ensure_models()
         self.score_threshold = score_threshold
         self.nms_threshold = nms_threshold
         self.cosine_threshold = cosine_threshold
+        self.top_k = top_k
 
         # Đảm bảo đường dẫn an toàn cho OpenCV C++
         # Nếu đang ở thư mục khác, chuyển tạm về BASE_DIR để load relative path nếu cần
@@ -120,7 +127,7 @@ class FaceEngine:
                 input_size=(320, 240),
                 score_threshold=self.score_threshold,
                 nms_threshold=self.nms_threshold,
-                top_k=5000
+                top_k=self.top_k
             )
 
             # Khởi tạo SFace Face Recognizer

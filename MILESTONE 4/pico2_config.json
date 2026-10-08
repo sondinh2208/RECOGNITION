@@ -1,0 +1,6 @@
+{
+  "bus_id": "BUS_01",
+  "threshold": 0.6,
+  "alert_webhook_url": "",
+  "camera_index": 0
+}

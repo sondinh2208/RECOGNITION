@@ -1,0 +1,32 @@
+Edge Cases Test Report – Face Access Control
+
+EC-01 Edge Case: Ánh sáng bình thường Điều kiện: Phòng đủ sáng, nhìn
+thẳng camera. Expected Result: Hệ thống nhận diện đúng người và hiển thị
+tên. Actual Result: Nhận diện đúng, confidence khoảng 0.70–0.78. 
+Status:PASS
+
+EC-02 Edge Case: Ánh sáng yếu Điều kiện: Giảm ánh sáng trong phòng.
+Expected Result: Vẫn phát hiện và nhận diện nếu khuôn mặt còn rõ. Actual
+Result: nhận diện chưa chính xác, phải giữ nguyên khuôn mặt confidence khoảng 0.55-0.7
+Status: PASS
+
+EC-03 Edge Case: Góc nghiêng khoảng 30° Điều kiện: Quay đầu sang
+trái/phải. Expected Result: Hệ thống vẫn nhận diện đúng. Actual Result:
+Nhận diện đúng ở nhiều khung hình. Status: PASS
+
+EC-04 Edge Case: Góc nghiêng lớn (~60°) Điều kiện: Quay gần ngang mặt.
+Expected Result: Có thể nhận diện hoặc chuyển sang Unknown. Actual
+Result: nhận diện chưa chính xác, confidence khoảng 0.4-0.5. Status: FALSE
+
+EC-05 Edge Case: Đeo khẩu trang Điều kiện: Che mũi và miệng. Expected
+Result: Có thể giảm độ chính xác hoặc hiển thị Unknown. Actual Result:
+Không nhận diện được, conf ở mức 0.2-0.35. Status: FALSE
+
+EC-06 Edge Case: Không có khuôn mặt Điều kiện: Người rời khỏi camera.
+Expected Result: Không hiển thị tên, không mở cửa. Actual Result: Không
+phát hiện nhận diện sai. Status: PASS
+
+EC-07 Edge Case: Che một phần khuôn mặt Điều kiện: Dùng điện thoại che
+một phần khuôn mặt. Expected Result: Confidence giảm hoặc hiển thị
+Unknown. Actual Result: Có thời điểm hiển thị Unknown, có thời điểm còn lên tới 0.6-0.7
+Status: FALSE

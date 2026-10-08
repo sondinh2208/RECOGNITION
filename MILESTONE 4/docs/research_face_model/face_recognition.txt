@@ -1,0 +1,63 @@
+BÁO CÁO NGHIÊN CỨU: CÁC MÔ HÌNH NHẬN DIỆN KHUÔN MẶT (FACE RECOGNITION MODELS)
+Sinh viên thực hiện: Mạnh Hùng
+
+1. ArcFace (Additive Angular Margin Loss)
+* Bản chất: Là thuật toán cốt lõi đang chạy ngầm bên trong thư viện InsightFace. 
+  ArcFace đưa các vector khuôn mặt lên một hình cầu và thêm một "biên độ góc" 
+  (Additive Angular Margin) vào hàm mất mát (Loss function) nhằm ép các khuôn mặt 
+  của cùng một người lại cực gần nhau, đồng thời đẩy khuôn mặt của những người 
+  khác nhau ra cực xa nhau.
+* Điểm mạnh: Độ chính xác cực kỳ cao, hiện tại vẫn là một trong những chuẩn mực 
+  tốt nhất thế giới cho bài toán nhận diện danh tính (Face Recognition).
+* Nhược điểm: Đòi hỏi tài nguyên tính toán lớn khi huấn luyện (train).
+* Link tham khảo:
+  - Github: https://github.com/deepinsight/insightface/tree/master/recognition/arcface_torch
+  - Paper: https://arxiv.org/abs/1801.07698
+
+2. FaceNet
+* Bản chất: Mô hình mở đường cho kỷ nguyên nhận diện khuôn mặt hiện đại do Google 
+  phát triển. Nó sử dụng kiến trúc Triplet Loss (Hàm mất mát bộ ba) để tối ưu hóa 
+  khoảng cách giữa 3 bức ảnh cùng lúc: Ảnh gốc (Anchor), Ảnh cùng người (Positive) 
+  và Ảnh người khác (Negative).
+* Điểm mạnh: Là mô hình đặt nền móng, cực kỳ phổ biến trong cộng đồng, tài liệu 
+  hướng dẫn tự viết code bằng Python/TensorFlow nhiều vô kể.
+* Nhược điểm: Thuật toán Triplet Loss cũ hơn nên độ chính xác không còn tối ưu bằng 
+  ArcFace khi gặp các góc chụp khó, mặt bị nghiêng hoặc ánh sáng yếu.
+* Link tham khảo:
+  - Github: https://github.com/davidsandberg/facenet
+  - Paper: https://arxiv.org/abs/1503.03832
+
+3. EdgeFace
+
+* Bản chất: Xu hướng mới của AI hiện đại, mang nhận diện khuôn mặt lên các thiết bị 
+  phần cứng nhỏ gọn (Edge Devices). Kết hợp giữa mạng CNN hiệu năng cao và cơ chế 
+  Vision Transformer tinh giản chuyên dụng để chạy trên CPU hoặc chip nhúng.
+* Điểm mạnh: Tiêu thụ cực ít tài nguyên phần cứng, bộ nhớ RAM yêu cầu thấp, tốc độ 
+  xử lý trích xuất Embedding cực nhanh trên CPU mà vẫn giữ được độ chính xác tốt.
+* Nhược điểm: Khi đối mặt với các bộ dữ liệu khổng lồ lên tới hàng triệu người, 
+  độ chính xác sẽ giảm nhẹ so với các mô hình "khủng long" như ArcFace bản lớn.
+* Link tham khảo:
+  - Github: https://github.com/eulmar/edgeface
+  - Paper: https://arxiv.org/abs/2404.03472
+
+4. AdaFace (Adaptive Margin Penalty)
+
+* Bản chất: Giải pháp tối ưu hóa thông minh cho dữ liệu thực tế chất lượng kém. 
+  Mô hình này tự động thay đổi (Adaptive) mức độ phạt của hàm mất mát dựa trên 
+  chất lượng của từng bức ảnh được đưa vào (ảnh mờ, tối, hạt nhiễu...).
+* Điểm mạnh: Vô địch khi xử lý các dữ liệu "bẩn" hoặc chất lượng thấp. Nếu ảnh 
+  quá mờ, nó sẽ giảm bớt độ khắt khe để tránh làm hỏng mô hình; nếu ảnh nét, 
+  nó sẽ tối ưu triệt để.
+* Nhược điểm: Thuật toán tính toán hàm loss khá phức tạp, lập trình khó hơn.
+* Link tham khảo:
+  - Github: https://github.com/minchulshin/adaface
+  - Paper: https://arxiv.org/abs/2204.00955
+
+
+BẢNG SO SÁNH TÓM TẮT
+Tiêu chí       | ArcFace          | FaceNet          | EdgeFace      | AdaFace
+--------------------------------------------------------------------------------
+Độ chính xác   | Rất Cao          | Khá              | Trung bình khá| Rất Cao
+Ảnh mờ/xấu     | Trung bình       | Kém              | Trung bình    | Tốt nhất
+Tốc độ CPU     | Trung bình       | Khá tốt          | Nhanh nhất    | Trung bình
+Mục đích dùng  | Bảo mật cao      | Học tập/Nghiên cứu| Thiết bị nhúng| Camera giám sát

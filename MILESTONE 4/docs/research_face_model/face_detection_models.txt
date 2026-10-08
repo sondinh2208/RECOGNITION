@@ -1,0 +1,61 @@
+CÁC MÔ HÌNH PHÁT HIỆN KHUÔN MẶT (FACE DETECTION MODELS)
+Sinh viên thực hiện: Mạnh Hùng
+
+1. SCRFD (Sample-and-Computation Redistribution Face Detection)
+
+* Bản chất: Là mô hình phát hiện khuôn mặt mặc định được tích hợp trong thư viện 
+  InsightFace. Nó tập trung vào việc phân phối lại khối lượng tính toán và các 
+  lớp mạng để đạt được tốc độ tối ưu nhất.
+* Điểm mạnh: Cực kỳ nhẹ và nhanh khi chạy trên CPU. Độ chính xác rất cao ngay cả 
+  khi khuôn mặt bị nghiêng hoặc bị che khuất một phần (như đeo khẩu trang).
+* Nhược điểm: Khi khuôn mặt ở quá xa camera hoặc kích thước quá nhỏ, độ chính xác 
+  có thể giảm nhẹ so với RetinaFace phiên bản lớn.
+* Link tham khảo:
+  - Github: https://github.com/deepinsight/insightface/tree/master/detection/scrfd
+  - Paper: https://arxiv.org/abs/2105.04714
+
+2. RetinaFace
+
+* Bản chất: Một mô hình phát hiện khuôn mặt đỉnh cao khác từ đội ngũ InsightFace, 
+  hoạt động theo cơ chế pixel-wise face localisation. Nó tìm đồng thời cả khung 
+  vuông (Bbox) và 5 điểm cốt lõi trên mặt (Landmarks: mắt, mũi, miệng...).
+* Điểm mạnh: Độ chính xác thuộc hàng top đầu ngành, nhận diện rất tốt các khuôn 
+  mặt siêu nhỏ, mờ hoặc trong điều kiện thiếu sáng.
+* Nhược điểm: Phiên bản đầy đủ (ResNet50 backbone) khá nặng, dễ gây giật lag nếu 
+  ép chạy trên CPU yếu. Cần dùng bản MobileNet để tối ưu.
+* Link tham khảo:
+  - Github: https://github.com/deepinsight/insightface/tree/master/detection/retinaface
+  - Paper: https://arxiv.org/abs/1905.00641
+
+3. MediaPipe Face Detection
+
+* Bản chất: Giải pháp do Google phát triển dựa trên kiến trúc BlazeFace, 
+  thiết kế riêng cho thiết bị di động và trình duyệt web.
+* Điểm mạnh: Siêu nhẹ, mượt mà tuyệt đối trên CPU laptop đời cũ mà không cần đến 
+  card đồ họa (GPU). Cài đặt dễ dàng chỉ với 1-2 dòng lệnh pip.
+* Nhược điểm: Độ chính xác ở mức trung bình. Khi quay mặt góc quá gắt (gần 90 độ) 
+  hoặc chuyển động nhanh gây nhòe ảnh, MediaPipe rất dễ mất dấu khuôn mặt.
+* Link tham khảo:
+  - Document: https://ai.google.dev/edge/mediapipe/solutions/vision/face_detector
+  - Github: https://github.com/google/mediapipe
+
+4. YOLO-Face (YOLOv5-Face / YOLOv8-Face)
+--------------------------------------------------------------------------------
+* Bản chất: Dựa trên kiến trúc của họ nhà YOLO (You Only Look Once), coi khuôn mặt 
+  là một đối tượng vật thể đặc biệt để quét qua một lần duy nhất.
+* Điểm mạnh: Tốc độ xử lý real-time cực tốt trên GPU. Phát hiện đám đông rất ấn tượng 
+  (phòng học có đông người) mà không bị sụt giảm FPS nhiều.
+* Nhược điểm: Các kho chứa model do cộng đồng tự custom hay bị thay đổi, dễ lỗi 
+  link download hoặc cần mã thực xác thực (token), khiến việc triển khai code ban đầu 
+  dễ gặp lỗi môi trường.
+* Link tham khảo:
+  - Github (YOLOv5-Face): https://github.com/dengkaiuan/YOLOv5-Face
+  - Document (Ultralytics YOLO): https://docs.ultralytics.com/
+
+BẢNG SO SÁNH TÓM TẮT
+================================================================================
+Tiêu chí       | SCRFD            | RetinaFace       | MediaPipe     | YOLO-Face
+--------------------------------------------------------------------------------
+Tốc độ CPU     | Rất Nhanh        | Trung bình/Chậm  | Vô địch mượt  | Khá tốt
+Độ chính xác   | Cao              | Rất Cao (Chuẩn)  | Trung bình    | Khá tốt 
+Ứng dụng tốt   | Nhận diện ID     | Nhiều mặt nhỏ    | Web/Mobile app| Giám sát/Đếm người

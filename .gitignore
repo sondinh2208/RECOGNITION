@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.log
+
+# Environment & Virtualenv
+.env
+.venv
+venv/
+ENV/
+
+# IDE & Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS generated files
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Exclude raw image dataset (PNG/JPG) in database
+MILESTONE 4/database/*.png
+MILESTONE 4/database/*.jpg
+MILESTONE 4/database/*.jpeg
+
+# SQLite databases (runtime generated)
+*.db

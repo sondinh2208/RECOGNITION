@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Điểm danh học sinh trên xe</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+</head>
+<body>
+    <div class="app-shell">
+        <aside class="sidebar">
+            <div class="brand">
+                <div class="brand-mark"><i class="fa-solid fa-bus-simple"></i></div>
+                <div>
+                    <h1>BusCheck</h1>
+                    <p>Điểm danh học sinh</p>
+                </div>
+            </div>
+
+            <nav class="nav-tabs" aria-label="Điều hướng">
+                <button class="nav-item active" data-tab="attendance"><i class="fa-solid fa-camera"></i><span>Điểm danh</span></button>
+                <button class="nav-item" data-tab="students"><i class="fa-solid fa-user-plus"></i><span>Học sinh</span></button>
+                <button class="nav-item" data-tab="compare"><i class="fa-solid fa-code-compare"></i><span>So sánh</span></button>
+                <button class="nav-item" data-tab="report"><i class="fa-solid fa-triangle-exclamation"></i><span>Báo cáo</span></button>
+            </nav>
+
+            <div class="sidebar-footer">
+                <span class="status-dot" id="apiStatusDot"></span>
+                <span id="apiStatusText">Đang kiểm tra API...</span>
+            </div>
+        </aside>
+
+        <main class="workspace">
+            <header class="topbar">
+                <div>
+                    <p class="eyebrow">Hệ thống xe khách trường học</p>
+                    <h2 id="pageTitle">Điểm danh tự động lên/xuống xe</h2>
+                </div>
+                <div class="clock">
+                    <span id="todayLabel"></span>
+                    <strong id="timeLabel"></strong>
+                </div>
+            </header>
+
+            <section class="metrics">
+                <article class="metric">
+                    <span>Học sinh</span>
+                    <strong id="studentCount">0</strong>
+                </article>
+                <article class="metric">
+                    <span>Đã lên</span>
+                    <strong id="boardCount">0</strong>
+                </article>
+                <article class="metric">
+                    <span>Đã xuống</span>
+                    <strong id="offCount">0</strong>
+                </article>
+                <article class="metric alert">
+                    <span>Bất thường</span>
+                    <strong id="issueCount">0</strong>
+                </article>
+            </section>
+
+            <section class="tab-panel active" id="attendance">
+                <div class="attendance-grid">
+                    <section class="camera-panel">
+                        <div class="panel-header">
+                            <div>
+                                <h3>Camera điểm danh</h3>
+                                <p>Chọn chế độ lên/xuống, camera sẽ tự chụp frame và gửi sang model nhận diện.</p>
+                            </div>
+                            <div class="mode-switch" role="group" aria-label="Chế độ điểm danh">
+                                <button class="mode-btn active" data-mode="len"><i class="fa-solid fa-arrow-right-to-bracket"></i>Lên xe</button>
+                                <button class="mode-btn" data-mode="xuong"><i class="fa-solid fa-arrow-right-from-bracket"></i>Xuống xe</button>
+                            </div>
+                        </div>
+
+                        <div class="camera-box">
+                            <video id="cameraStream" autoplay playsinline></video>
+                            <canvas id="captureCanvas" hidden></canvas>
+                            <div class="camera-empty" id="cameraEmpty">
+                                <i class="fa-solid fa-video-slash"></i>
+                                <span>Camera chưa bật</span>
+                            </div>
+                        </div>
+
+                        <div class="recognition-card">
+                            <div>
+                                <span>Học sinh vừa nhận diện</span>
+                                <strong id="recognitionName">Chưa có</strong>
+                                <p id="recognitionMeta">Bật camera để hệ thống tự quét.</p>
+                            </div>
+                            <div class="auto-status" id="scanStatus">Camera tắt, chưa quét nhận diện.</div>
+                        </div>
+
+                        <div class="capture-controls">
+                            <button class="btn secondary" id="startCamera"><i class="fa-solid fa-video"></i>Bật camera & tự quét</button>
+                            <button class="btn ghost" id="stopCamera"><i class="fa-solid fa-video-slash"></i>Tắt camera</button>
+                        </div>
+                    </section>
+
+                    <section class="activity-panel">
+                        <div class="panel-header">
+                            <div>
+                                <h3>Nhật ký gần nhất</h3>
+                                <p>Hệ thống tự ghi khi model nhận ra học sinh trong camera.</p>
+                            </div>
+                        </div>
+                        <div class="activity-list" id="activityList"></div>
+                    </section>
+                </div>
+            </section>
+
+            <section class="tab-panel" id="students">
+                <div class="student-layout">
+                    <form class="student-form" id="studentForm">
+                        <div class="panel-header">
+                            <div>
+                                <h3>Thêm khuôn mặt học sinh</h3>
+                                <p>Chọn 1 ảnh mặt học sinh để API embedding và lưu vào database .npy.</p>
+                            </div>
+                        </div>
+                        <label>
+                            Họ và tên
+                            <input id="studentName" type="text" placeholder="Ví dụ: Nguyễn Văn An" autocomplete="off">
+                        </label>
+                        <label>
+                            Lớp
+                            <input id="studentClass" type="text" placeholder="Ví dụ: 7A1" autocomplete="off">
+                        </label>
+                        <label>
+                            Ảnh khuôn mặt để embedding
+                            <input id="studentPhoto" type="file" accept="image/*">
+                        </label>
+                        <button class="btn primary" type="submit"><i class="fa-solid fa-floppy-disk"></i>Embedding & lưu học sinh</button>
+                    </form>
+
+                    <section class="student-list-panel">
+                        <div class="panel-header">
+                            <div>
+                                <h3>Danh sách học sinh</h3>
+                                <p>Danh sách đồng bộ từ database embedding và lịch sử trình duyệt.</p>
+                            </div>
+                            <button class="btn danger" id="clearData"><i class="fa-solid fa-trash"></i>Xóa lịch sử</button>
+                        </div>
+                        <div class="student-list" id="studentList"></div>
+                    </section>
+                </div>
+            </section>
+
+            <section class="tab-panel" id="compare">
+                <div class="table-panel">
+                    <div class="panel-header">
+                        <div>
+                            <h3>So sánh lên/xuống</h3>
+                            <p>Danh sách đối chiếu theo ngày hiện tại.</p>
+                        </div>
+                    </div>
+                    <div class="responsive-table">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Học sinh</th>
+                                    <th>Lớp</th>
+                                    <th>Lần lên cuối</th>
+                                    <th>Lần xuống cuối</th>
+                                    <th>Số lượt</th>
+                                    <th>Trạng thái</th>
+                                </tr>
+                            </thead>
+                            <tbody id="compareTable"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <section class="tab-panel" id="report">
+                <div class="report-grid">
+                    <section class="report-panel">
+                        <div class="panel-header">
+                            <div>
+                                <h3>Báo cáo bất thường</h3>
+                                <p>Phát hiện học sinh lên xe chưa xuống hoặc xuống chưa có lượt lên.</p>
+                            </div>
+                        </div>
+                        <div id="reportList" class="report-list"></div>
+                    </section>
+                    <section class="report-panel">
+                        <div class="panel-header">
+                            <div>
+                                <h3>Ảnh lưu gần nhất</h3>
+                                <p>Ảnh 1 đến ảnh 10, quá 10 ảnh sẽ tự bỏ ảnh cũ nhất.</p>
+                            </div>
+                        </div>
+                        <div id="photoAudit" class="photo-audit"></div>
+                    </section>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <div class="toast" id="toast"></div>
+    <script src="script.js"></script>
+</body>
+</html>

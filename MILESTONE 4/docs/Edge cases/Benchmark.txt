@@ -1,0 +1,37 @@
+BÁO CÁO ĐÁNH GIÁ HIỆU NĂNG (BENCHMARK REPORT)
+
+-----------------------------------------------------------------------------------------------------------------------
+Chỉ số (Metric)          Ý nghĩa (Meaning)                          Đơn vị / Công thức (Unit / Formula)   Kết quả (Result)
+-----------------------------------------------------------------------------------------------------------------------
+TPR (Tỷ lệ nhận diện     Nhận diện đúng người đã đăng kí khuôn      TP / (TP + FN) × 100%                 100%
+đúng người đăng kí)      mặt
+
+FPR (Tỷ lệ nhận diện     Tỷ lệ người dùng không có quyền truy cập  FP/(FP+TN) × 100%                     0%
+sai)                     bị nhận là đúng                
+
+Tốc độ phát hiện         Tốc độ xử lý của hệ thống nhận diện        FPS (Khung hình/giây)                 15-30 FPS
+(Detection Speed)           
+
+Tổng độ trễ             Thời gian từ khi camera nhận tín hiệu đầu  Mili-giây (ms)                        1000ms
+(Total Latency)          vào đến khi trả về kết quả nhận diện                                            
+-----------------------------------------------------------------------------------------------------------------------
+
+Mô tả chi tiết (Description)
+
+1. TPR (True Positive Rate - Tỷ lệ nhận diện đúng)
+- Đo lường phần trăm người dùng đã đăng ký được hệ thống nhận diện chính xác.
+- Giá trị càng cao thể hiện hiệu suất nhận diện càng tốt.
+
+2. FPR (False Positive Rate - Tỷ lệ nhận diện sai)
+- Đo lường phần trăm người dùng chưa được cấp quyền bị nhận diện/chấp nhận sai.
+- Giá trị càng thấp thể hiện độ bảo mật càng cao.
+
+3. Tốc độ phát hiện (Detection Speed)
+- Cho biết số lượng khung hình mà hệ thống xử lý được trong một giây.
+- Trong dự án này, camera được cấu hình để đạt khoảng 15-30 FPS.
+
+4. Tổng độ trễ (Total Latency)
+- Tổng thời gian tính từ lúc người dùng xuất hiện trước camera cho đến khi hệ thống hiển thị kết quả nhận diện và gửi lệnh MỞ (OPEN) tới ESP32.
+- Bao gồm các công đoạn: phát hiện khuôn mặt (face detection), trích xuất đặc trưng (embedding extraction), đối soát khuôn mặt (face matching), và truyền thông nối tiếp (serial communication).
+
+
